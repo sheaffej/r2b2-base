@@ -238,124 +238,119 @@ class BaseNode(rclpy.node.Node):
         )
 
     def _base_loop_callback(self):
-        _process_base_loop(self)
+        # ------------------------------------------------------------
+        # If the last command was over deadman_secs ago, stop the base
+        # ------------------------------------------------------------
+        if (
+            self._last_cmd_vel_time is None or
+            (self.get_clock().now() - self._last_cmd_vel_time).nanoseconds / 1e9 > self._deadman_secs
+        ):
+            self._x_linear_cmd = 0.0
+            self._z_angular_cmd = 0.0
 
+        # ---------------------------------
+        # Calculate and send motor commands
+        # ---------------------------------
+        with self._cmd_vel_lock:
+            x_linear_cmd = self._x_linear_cmd
+            z_angular_cmd = self._z_angular_cmd
 
-# Separated out of node object so it can be more easily unit tested
-def _process_base_loop(self: BaseNode):
-    # ------------------------------------------------------------
-    # If the last command was over deadman_secs ago, stop the base
-    # ------------------------------------------------------------
-    if (
-        self._last_cmd_vel_time is None or
-        (self.get_clock().now() - self._last_cmd_vel_time).nanoseconds / 1e9 > self._deadman_secs
-    ):
-        self._x_linear_cmd = 0.0
-        self._z_angular_cmd = 0.0
+        # Clamp the velocities to the max configured for the base
+        x_linear_cmd = max(-self._max_x_lin_vel, min(x_linear_cmd, self._max_x_lin_vel))
+        z_angular_cmd = max(-self._max_z_ang_vel, min(z_angular_cmd, self._max_z_ang_vel))
 
-    # ---------------------------------
-    # Calculate and send motor commands
-    # ---------------------------------
-    with self._cmd_vel_lock:
-        x_linear_cmd = self._x_linear_cmd
-        z_angular_cmd = self._z_angular_cmd
-
-    # Clamp the velocities to the max configured for the base
-    x_linear_cmd = max(-self._max_x_lin_vel, min(x_linear_cmd, self._max_x_lin_vel))
-    z_angular_cmd = max(-self._max_z_ang_vel, min(z_angular_cmd, self._max_z_ang_vel))
-
-    cmd = calc_create_speed_cmd(
-        x_linear_cmd, z_angular_cmd,
-        self._wheel_dist, self._wheel_radius, self._wheel_slip_factor,
-        self._ticks_per_rotation, self._max_drive_secs, self._max_qpps, self._max_accel
-    )
-    self.get_logger().debug(f"Publishing: {cmd}")
-    self._speed_cmd_pub.publish(cmd)
-
-    # -------------------------------
-    # Calculate and publish Odometry
-    # -------------------------------
-
-    if self._roboclaw_front_stats is None:
-        self.get_logger().info("Insufficient roboclaw stats received, skipping odometry calculation")
-        return
-
-    with self._stats_lock:
-        # Calculate change in encoder readings
-        m1_front_enc_diff = self._roboclaw_front_stats.m1_enc_val - self._m1_front_enc_prev
-        m2_front_enc_diff = self._roboclaw_front_stats.m2_enc_val - self._m2_front_enc_prev
-        # m1_rear_enc_diff = self._roboclaw_rear_stats.m1_enc_val - self._m1_rear_enc_prev
-        # m2_rear_enc_diff = self._roboclaw_rear_stats.m2_enc_val - self._m2_rear_enc_prev
-
-        self._m1_front_enc_prev = self._roboclaw_front_stats.m1_enc_val
-        self._m2_front_enc_prev = self._roboclaw_front_stats.m2_enc_val
-        # self._m1_rear_enc_prev = self._roboclaw_rear_stats.m1_enc_val
-        # self._m2_rear_enc_prev = self._roboclaw_rear_stats.m2_enc_val
-
-        # Since we have a two Roboclaw robot, take the average of the encoder diffs
-        # from each Roboclaw for each side.
-        # m1_enc_diff = (m1_front_enc_diff + m1_rear_enc_diff) / 2
-        # m2_enc_diff = (m2_front_enc_diff + m2_rear_enc_diff) / 2
-        m1_enc_diff = m1_front_enc_diff
-        m2_enc_diff = m2_front_enc_diff
-
-        # We take the nowtime from the Stats message so it matches the encoder values.
-        # Otherwise we would get timing variances based on when the loop runs compared to
-        # when the stats were measured.
-        # Since we have a two Roboclaw robot, take the latest stats timestamp from either
-        # Roboclaw.
-        front_stamp = self._roboclaw_front_stats.header.stamp
-        # rear_stamp = self._roboclaw_rear_stats.header.stamp
-        nowtime = rclpy.time.Time.from_msg(front_stamp)
-
-    x_linear_v, y_linear_v, z_angular_v = calc_base_frame_velocity_from_encoder_diffs(
-        m1_enc_diff, m2_enc_diff, self._ticks_per_rotation,
-        self._wheel_radius, self._wheel_dist, self._wheel_slip_factor,
-        self._last_odom_time, nowtime
-    )
-
-    time_delta_secs = (nowtime - self._last_odom_time).nanoseconds / 1e9
-    self._last_odom_time = nowtime
-
-    odom = calc_odometry_from_base_velocity(
-        x_linear_v, y_linear_v, z_angular_v,
-        self._world_x, self._world_y, self._world_theta,
-        time_delta_secs, nowtime,
-        self._base_frame_id, self._world_frame_id
-    )
-    self._odom_pub.publish(odom)
-
-    # Update world pose
-    self._world_x = odom.pose.pose.position.x
-    self._world_y = odom.pose.pose.position.y
-    self._world_theta = yaw_from_odom_message(odom)
-
-    # -----------------------------------------
-    # Calculate and broacast tf transformation
-    # -----------------------------------------
-    if self._publish_odom_tf:
-        quat = odom.pose.pose.orientation
-        t = TransformStamped()
-        t.header.stamp = nowtime.to_msg()
-        t.header.frame_id = self._world_frame_id
-        t.child_frame_id = self._base_frame_id
-        t.transform.translation.x = self._world_x
-        t.transform.translation.y = self._world_y
-        t.transform.translation.z = 0.0
-        t.transform.rotation.x = quat.x
-        t.transform.rotation.y = quat.y
-        t.transform.rotation.z = quat.z
-        t.transform.rotation.w = quat.w
-        self._tf_broadcaster.sendTransform(t)
-
-    self._last_odom_time = nowtime
-
-    self.get_logger().debug(
-        "World position: [{}, {}] heading: {}, forward speed: {}, turn speed: {}".format(
-            self._world_x, self._world_y, self._world_theta,
-            self._x_linear_cmd, self._z_angular_cmd
+        cmd = calc_create_speed_cmd(
+            x_linear_cmd, z_angular_cmd,
+            self._wheel_dist, self._wheel_radius, self._wheel_slip_factor,
+            self._ticks_per_rotation, self._max_drive_secs, self._max_qpps, self._max_accel
         )
-    )
+        self.get_logger().debug(f"Publishing: {cmd}")
+        self._speed_cmd_pub.publish(cmd)
+
+        # -------------------------------
+        # Calculate and publish Odometry
+        # -------------------------------
+
+        if self._roboclaw_front_stats is None:
+            self.get_logger().info("Insufficient roboclaw stats received, skipping odometry calculation")
+            return
+
+        with self._stats_lock:
+            # Calculate change in encoder readings
+            m1_front_enc_diff = self._roboclaw_front_stats.m1_enc_val - self._m1_front_enc_prev
+            m2_front_enc_diff = self._roboclaw_front_stats.m2_enc_val - self._m2_front_enc_prev
+            # m1_rear_enc_diff = self._roboclaw_rear_stats.m1_enc_val - self._m1_rear_enc_prev
+            # m2_rear_enc_diff = self._roboclaw_rear_stats.m2_enc_val - self._m2_rear_enc_prev
+
+            self._m1_front_enc_prev = self._roboclaw_front_stats.m1_enc_val
+            self._m2_front_enc_prev = self._roboclaw_front_stats.m2_enc_val
+            # self._m1_rear_enc_prev = self._roboclaw_rear_stats.m1_enc_val
+            # self._m2_rear_enc_prev = self._roboclaw_rear_stats.m2_enc_val
+
+            # Since we have a two Roboclaw robot, take the average of the encoder diffs
+            # from each Roboclaw for each side.
+            # m1_enc_diff = (m1_front_enc_diff + m1_rear_enc_diff) / 2
+            # m2_enc_diff = (m2_front_enc_diff + m2_rear_enc_diff) / 2
+            m1_enc_diff = m1_front_enc_diff
+            m2_enc_diff = m2_front_enc_diff
+
+            # We take the nowtime from the Stats message so it matches the encoder values.
+            # Otherwise we would get timing variances based on when the loop runs compared to
+            # when the stats were measured.
+            # Since we have a two Roboclaw robot, take the latest stats timestamp from either
+            # Roboclaw.
+            front_stamp = self._roboclaw_front_stats.header.stamp
+            # rear_stamp = self._roboclaw_rear_stats.header.stamp
+            nowtime = rclpy.time.Time.from_msg(front_stamp)
+
+        x_linear_v, y_linear_v, z_angular_v = calc_base_frame_velocity_from_encoder_diffs(
+            m1_enc_diff, m2_enc_diff, self._ticks_per_rotation,
+            self._wheel_radius, self._wheel_dist, self._wheel_slip_factor,
+            self._last_odom_time, nowtime
+        )
+
+        time_delta_secs = (nowtime - self._last_odom_time).nanoseconds / 1e9
+        self._last_odom_time = nowtime
+
+        odom = calc_odometry_from_base_velocity(
+            x_linear_v, y_linear_v, z_angular_v,
+            self._world_x, self._world_y, self._world_theta,
+            time_delta_secs, nowtime,
+            self._base_frame_id, self._world_frame_id
+        )
+        self._odom_pub.publish(odom)
+
+        # Update world pose
+        self._world_x = odom.pose.pose.position.x
+        self._world_y = odom.pose.pose.position.y
+        self._world_theta = yaw_from_odom_message(odom)
+
+        # -----------------------------------------
+        # Calculate and broacast tf transformation
+        # -----------------------------------------
+        if self._publish_odom_tf:
+            quat = odom.pose.pose.orientation
+            t = TransformStamped()
+            t.header.stamp = nowtime.to_msg()
+            t.header.frame_id = self._world_frame_id
+            t.child_frame_id = self._base_frame_id
+            t.transform.translation.x = self._world_x
+            t.transform.translation.y = self._world_y
+            t.transform.translation.z = 0.0
+            t.transform.rotation.x = quat.x
+            t.transform.rotation.y = quat.y
+            t.transform.rotation.z = quat.z
+            t.transform.rotation.w = quat.w
+            self._tf_broadcaster.sendTransform(t)
+
+        self._last_odom_time = nowtime
+
+        self.get_logger().debug(
+            "World position: [{}, {}] heading: {}, forward speed: {}, turn speed: {}".format(
+                self._world_x, self._world_y, self._world_theta,
+                self._x_linear_cmd, self._z_angular_cmd
+            )
+        )
 
 
 def main(args=None):
