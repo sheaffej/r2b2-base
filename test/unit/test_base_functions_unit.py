@@ -2,7 +2,6 @@
 import math
 
 import pytest
-# import rclpy
 from rclpy.time import Time, Duration
 
 from r2b2_base.base_functions import (
@@ -24,7 +23,6 @@ class RobotParameters():
         self.wheel_dist = 0.220
         self.wheel_radius = 0.0325
         self.wheel_slip_factor = 0.5  # Decimal % of angular motion lost to slip
-        # self.ticks_per_radian = 48 * 34
         self.ticks_per_rotation = 1632
         self.base_frame_id = "base_frame"
         self.world_frame_id = "world_frame"

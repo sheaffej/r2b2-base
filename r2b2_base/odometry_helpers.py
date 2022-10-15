@@ -51,7 +51,7 @@ def add_radians(a, b):
 
 
 def radians_between(a: float, b: float) -> float:
-    """Calculates the absolute radians between two angles given in radians.
+    """Calculates the absolute minimum radians between two angles.
 
     Args:
         a (float): First angle in radians
@@ -60,9 +60,11 @@ def radians_between(a: float, b: float) -> float:
 
     # Example if the angles can go from: 0.0 -- 6.0
 
-    # a=1.0, b=5.0:  4.0 or [2.0] <-- this is the answer
-    # 1 - 5 = -4 --> 6 + -4 = 2
+    # a=1.0, b=5.0:  diff is 4.0 or [2.0] <-- this is the answer
+    # 1 - 5 = -4 
+    #   Since the answer is negative, subtract from the max --> 6 + -4 = 2
     # 5 - 1 = 4
+    # Take the smallest answer min(2, 4) --> 2
 
     # a=0.5, b=5.5: 5.0, [1.0]
     # 0.5 - 5.5 = -5 -> 6 + -5 = 1.0

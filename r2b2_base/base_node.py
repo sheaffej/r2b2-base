@@ -5,7 +5,6 @@ from math import pi as pi
 import sys
 import threading
 import traceback
-from typing import List
 
 from geometry_msgs.msg import Twist, TransformStamped
 from nav_msgs.msg import Odometry
@@ -13,7 +12,6 @@ import rclpy
 from rclpy.time import Time
 
 from rcl_interfaces.msg import ParameterDescriptor
-# import tf
 import tf2_ros
 
 from roboclaw_interfaces.msg import SpeedCommand, Stats
@@ -206,31 +204,6 @@ class BaseNode(rclpy.node.Node):
         self._last_odom_time: Time = self.get_clock().now()
         self._last_cmd_vel_time: Time = self.get_clock().now()
 
-    # def run(self, loop_hz):
-    #     """Runs the main loop of the node.
-    #     Sends motor commands, and publishes odometry.
-    #     """
-    #     rospy.logdebug("Running node")
-    #     looprate = rospy.Rate(loop_hz)
-
-    #     # Set initial states
-    #     if self._roboclaw_front_stats is not None:
-    #         self._m1_front_enc_prev = self._roboclaw_front_stats.m1_enc_val
-    #         self._m2_front_enc_prev = self._roboclaw_front_stats.m2_enc_val
-    #     # if self._roboclaw_rear_stats is not None:
-    #     #     self._m1_rear_enc_prev = self._roboclaw_rear_stats.m1_enc_val
-    #     #     self._m2_rear_enc_prev = self._roboclaw_rear_stats.m2_enc_val
-    #     self._last_odom_time = rospy.get_rostime()
-    #     self._last_cmd_vel_time = rospy.get_rostime()
-
-    #     try:
-    #         while not rospy.is_shutdown():
-    #             self.process_base_loop()
-    #             looprate.sleep()
-
-    #     except rospy.ROSInterruptException:
-    #         rospy.logwarn("ROSInterruptException received in main loop")
-
     def _cmd_vel_callback(self, msg: Twist):
         """Called by the Twist cmd_vel message subscriber.
 
@@ -238,13 +211,6 @@ class BaseNode(rclpy.node.Node):
             msg (Twist): Twist command velocity message
         """
         with self._cmd_vel_lock:
-
-            # if ((self.get_clock().now() - self._last_cmd_vel_time).nanoseconds / 1e9 > 0
-            #         and msg.linear.x == self._x_linear_cmd
-            #         and msg.angular.z == self._z_angular_cmd):
-            #     self.get_logger().debug("Cmd Vel received, but no change in values")
-
-            # else:
             self._x_linear_cmd = msg.linear.x
             self._z_angular_cmd = msg.angular.z
             self._last_cmd_vel_time = self.get_clock().now()
@@ -310,7 +276,6 @@ def _process_base_loop(self: BaseNode):
     # Calculate and publish Odometry
     # -------------------------------
 
-    # if self._roboclaw_front_stats is None or self._roboclaw_rear_stats is None:
     if self._roboclaw_front_stats is None:
         self.get_logger().info("Insufficient roboclaw stats received, skipping odometry calculation")
         return
@@ -340,11 +305,7 @@ def _process_base_loop(self: BaseNode):
         # Since we have a two Roboclaw robot, take the latest stats timestamp from either
         # Roboclaw.
         front_stamp = self._roboclaw_front_stats.header.stamp
-        # print(type(front_stamp))
-        # import builtin_interfaces
-        # print(isinstance(front_stamp, builtin_interfaces.msg.Time))
         # rear_stamp = self._roboclaw_rear_stats.header.stamp
-        # nowtime = max(front_stamp, rear_stamp)
         nowtime = rclpy.time.Time.from_msg(front_stamp)
 
     x_linear_v, y_linear_v, z_angular_v = calc_base_frame_velocity_from_encoder_diffs(
@@ -362,7 +323,6 @@ def _process_base_loop(self: BaseNode):
         time_delta_secs, nowtime,
         self._base_frame_id, self._world_frame_id
     )
-    # self.get_logger().debug(f"Publishing: {odom}")
     self._odom_pub.publish(odom)
 
     # Update world pose
@@ -375,13 +335,6 @@ def _process_base_loop(self: BaseNode):
     # -----------------------------------------
     if self._publish_odom_tf:
         quat = odom.pose.pose.orientation
-    #     self._tf_broadcaster.sendTransform(
-    #         (self._world_x, self._world_y, 0),
-    #         (quat.x, quat.y, quat.z, quat.w),
-    #         nowtime,
-    #         self._base_frame_id,
-    #         self._world_frame_id
-    #     )
         t = TransformStamped()
         t.header.stamp = nowtime.to_msg()
         t.header.frame_id = self._world_frame_id
@@ -393,7 +346,6 @@ def _process_base_loop(self: BaseNode):
         t.transform.rotation.y = quat.y
         t.transform.rotation.z = quat.z
         t.transform.rotation.w = quat.w
-        # self.get_logger().debug(f"Publishing: {t}")
         self._tf_broadcaster.sendTransform(t)
 
     self._last_odom_time = nowtime
@@ -413,9 +365,6 @@ def main(args=None):
     node = BaseNode()
 
     try:
-        # # Initialize the Roboclaw controllers
-        # for dev in dev_names.split(','):
-        #     node.connect(dev, baud_rate, address, test_mode)
         rclpy.spin(node)
 
     except Exception:
@@ -428,68 +377,3 @@ def main(args=None):
 
 if __name__ == "__main__":
     main(args=sys.argv)
-
-    # log_level = parse_log_level(rospy.get_param("~log_level", LOG_LEVEL))
-    # rospy.init_node(DEFAULT_NODE_NAME, log_level=log_level)
-    # node_name = rospy.get_name()
-
-    # wheel_dist = rospy.get_param("~wheel_dist", DEFAULT_WHEEL_DIST)
-    # wheel_radius = rospy.get_param("~wheel_radius", DEFAULT_WHEEL_RADIUS)
-    # wheel_slip_factor = rospy.get_param("~wheel_slip_factor", DEFAULT_WHEEL_SLIP_FACTOR)
-    # ticks_per_rotation = rospy.get_param("~ticks_per_rotation", DEFAULT_TICKS_PER_ROTATION)
-    # max_drive_secs = rospy.get_param("~max_drive_secs", DEFAULT_MAX_DRIVE_SECS)
-    # deadman_secs = rospy.get_param("~deadman_secs", DEFAULT_DEADMAN_SECS)
-    # max_qpps = rospy.get_param("~max_qpps", DEFAULT_MAX_QPPS)
-    # max_x_lin_vel = rospy.get_param("~max_x_lin_vel", DEFAULT_MAX_X_LINEAR_VEL)
-    # max_z_ang_vel = rospy.get_param("~max_z_ang_vel", DEFAULT_MAX_Z_ANGULAR_VEL)
-    # max_accel = rospy.get_param("~max_accel", DEFAULT_MAX_ACCEL)
-    # base_frame_id = rospy.get_param("~base_frame_id", DEFAULT_BASE_FRAME_ID)
-    # world_frame_id = rospy.get_param("~odom_frame_id", DEFAULT_ODOM_FRAME_ID)
-    # loop_hz = rospy.get_param("~loop_hz", DEFAULT_LOOP_HZ)
-    # publish_odom_tf = rospy.get_param("~publish_odom_tf", DEFAULT_PUBLISH_ODOM_TF)
-
-    # # Publishes
-    # speed_cmd_pub = rospy.Publisher(
-    #     rospy.get_param('~speed_cmd_topic', DEFAULT_SPEED_CMD_TOPIC),
-    #     SpeedCommand,
-    #     queue_size=1
-    # )
-    # odom_pub = rospy.Publisher(
-    #     rospy.get_param('~odom_topic', DEFAULT_ODOM_TOPIC),
-    #     Odometry,
-    #     queue_size=1
-    # )
-
-    # tf_broadcaster = None
-    # if publish_odom_tf:
-    #     tf_broadcaster = tf.broadcaster.TransformBroadcaster()
-
-    # node = BaseNode(wheel_dist, wheel_radius, wheel_slip_factor, ticks_per_rotation,
-    #                 max_drive_secs, deadman_secs,
-    #                 max_qpps, max_x_lin_vel, max_z_ang_vel, max_accel,
-    #                 base_frame_id, world_frame_id,
-    #                 speed_cmd_pub, odom_pub, publish_odom_tf, tf_broadcaster)
-
-    # # Twist message Subscriber
-    # rospy.Subscriber(
-    #     rospy.get_param("~cmd_vel_topic", DEFAULT_CMD_VEL_TOPIC),
-    #     Twist,
-    #     node.cmd_vel_callback
-    # )
-
-    # # Roboclaw Stats message Subscriber
-    # rospy.Subscriber(
-    #     rospy.get_param("~roboclaw_front_stats_topic", DEFAULT_ROBOCLAW_FRONT_STATS_TOPIC),
-    #     Stats,
-    #     node.roboclaw_stats_callback,
-    #     "front"
-    # )
-
-    # rospy.Subscriber(
-    #     rospy.get_param("~roboclaw_rear_stats_topic", DEFAULT_ROBOCLAW_REAR_STATS_TOPIC),
-    #     Stats,
-    #     node.roboclaw_stats_callback,
-    #     "rear"
-    # )
-
-    # node.run(loop_hz)

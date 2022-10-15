@@ -206,7 +206,6 @@ def test_turn_right(test_node: NodeTestingNode, base_node: BaseNode, roboclaw_no
 
 
 def test_multi_movement(test_node: NodeTestingNode, base_node: BaseNode, roboclaw_node: MockRoboclawNode):
-    # self.test_drive_reverse()
     test_drive_forward(test_node, base_node, roboclaw_node)
     test_turn_left(test_node, base_node, roboclaw_node)
     test_drive_forward(test_node, base_node, roboclaw_node)
@@ -297,10 +296,6 @@ def _compare_odometry(odom: Odometry, world_x_exp: float, world_y_exp: float, wo
         xy_diff_dist (float): Distance (meters) allowed diff in xy actual vs expected values
         th_diff_rads (float): Angle (radians) allowed diff in theta actual vs expected values
     """
-    # print("Staring World: ({}, {}, {})".format(
-    #     start_world_x, start_world_y, start_world_theta))
-    # print("Expected World: ({}, {}, {})".format(world_x_exp, world_y_exp, world_theta_exp))
-
     x_actual = odom.pose.pose.position.x
     y_actual = odom.pose.pose.position.y
     th_actual = euler_from_quaternion(
@@ -322,11 +317,6 @@ def _compare_odometry(odom: Odometry, world_x_exp: float, world_y_exp: float, wo
     assert (x_exp_adj - xy_diff_dist) <= x_actual <= (x_exp_adj + xy_diff_dist), f"X exp: {x_exp_adj}, actual {x_actual}, diff allowed {xy_diff_dist}"
     assert (y_exp_adj - xy_diff_dist) <= y_actual <= (y_exp_adj + xy_diff_dist), f"Y exp: {y_exp_adj}, actual {y_actual}, diff allowed {xy_diff_dist}"
 
-    # assert (
-    #     normalize_theta(add_radians(theta_exp_adj, -th_diff_rads))
-    #     <= normalize_theta(th_actual)
-    #     <= normalize_theta(add_radians(theta_exp_adj, th_diff_rads))
-    # ), f"Theta exp: {theta_exp_adj}, actual {th_actual}, diff allowed {th_diff_rads} \n  ({normalize_theta(add_radians(theta_exp_adj, -th_diff_rads))} <= {normalize_theta(th_actual)} <= {normalize_theta(add_radians(theta_exp_adj, th_diff_rads))})"
     assert radians_between(theta_exp_adj, th_actual) < th_diff_rads, f"Theta exp: {theta_exp_adj}, actual {th_actual}, diff between {radians_between(theta_exp_adj, th_actual)}, diff allowed {th_diff_rads}"
     print(f"Theta exp: {theta_exp_adj}, actual {th_actual}, diff between {radians_between(theta_exp_adj, th_actual)}, diff allowed {th_diff_rads}")
 
