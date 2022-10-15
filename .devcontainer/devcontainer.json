@@ -1,0 +1,33 @@
+{
+	"name": "R2B2-Base Docker",
+	"context": "..",
+	"dockerFile": "Dockerfile",
+	"runArgs": [
+		"--name", "r2b2-base-vscode"
+	],
+
+    "containerEnv": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+    },
+
+	// You can edit these settings after create using File > Preferences > Settings > Remote.
+	"settings": { 
+		"python.pythonPath": "/usr/bin/python3",
+		"python.autoComplete.extraPaths": [
+			"/opt/ros/galactic/lib/python3.8/site-packages",
+			"/ros2/install/r2b2_base/lib/python3.8/site-packages",
+            "/ros2/install/roboclaw_interfaces/lib/python3.8/site-packages"
+		],		
+		"python.linting.pylintEnabled": true,
+		"python.linting.enabled": true,
+        "python.linting.flake8Enabled": true,
+        "terminal.integrated.cwd": "/ros2"
+	},
+
+	"appPort": [],
+
+	"extensions": [
+		"ms-python.python",
+        "njpwerner.autodocstring"
+	]
+}
