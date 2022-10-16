@@ -26,9 +26,14 @@ RUN mkdir -p ${ROS_WS}/src
 # Add this package
 RUN ln -s /workspaces/${PKG_NAME} ${ROS_WS}/src/${PKG_NAME}
 
+# -------------------------
 # Add other source packages
+# -------------------------
+
+# To force rebuilding the layers below, execute on the host docker host "date > nocache-github"
+ADD nocache-github /tmp/nocache-github
+
 WORKDIR ${ROS_WS}/src 
-ADD https://api.github.com/repos/sheaffej/roboclaw_interfaces/git/refs/heads/main /tmp/roboclaw_interfaces_version.json
 RUN git clone https://github.com/sheaffej/roboclaw_interfaces.git
 
 # # Install dependencies
