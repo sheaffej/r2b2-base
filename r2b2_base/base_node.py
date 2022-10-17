@@ -361,7 +361,8 @@ def main(args=None):
 
     try:
         rclpy.spin(node)
-
+    except KeyboardInterrupt:
+        pass
     except Exception:
         node.get_logger().fatal("Unhandled exeption...printing stack trace then shutting down node")
         node.get_logger().fatal(traceback.format_exc())
