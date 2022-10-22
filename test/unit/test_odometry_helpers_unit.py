@@ -1,8 +1,14 @@
 import math
 
 import pytest
+from rclpy.time import Time
 
-from r2b2_base.odometry_helpers import normalize_theta, calc_world_frame_pose, calc_steering_angle
+from nav_msgs.msg import Odometry
+
+from r2b2_base.odometry_helpers import (
+    normalize_theta, calc_world_frame_pose, calc_steering_angle,
+    create_odometry_message, yaw_from_odom_message
+)
 
 
 pi = math.pi
@@ -18,12 +24,12 @@ def test_normalize_theta():
         (twopi, 0.0),           # 360 = 0
         (-twopi, 0.0),          # -360 = 0
         (0, 0),                 # 0 = 0
-        (pi/2 - pi, pi * 1.5),  # -90 = 270
+        (pi / 2 - pi, pi * 1.5),  # -90 = 270
 
         # More that 2 Pi cases
         (twopi + pi, pi),       # 3 pi = pi
         (-twopi - pi, pi),      # -3 pi = pi
-        (pi + pi * 1.5, pi/2)   # 2.5 pi = 0.5 pi
+        (pi + pi * 1.5, pi / 2)   # 2.5 pi = 0.5 pi
     ]
 
     for input_theta, exp_normal_theta in tests:
@@ -36,8 +42,8 @@ def test_normalize_theta():
 def test_calc_steering_angle():
     # (current_heading, target_heading, exp_steering_angle)
     tests = [
-        (pi/2, pi, pi/2),       # 90 deg -> 180 deg = +90 deg
-        (pi/4, -pi/4, -pi/2),   # 45 deg -> -45 deg = -90 deg
+        (pi / 2, pi, pi / 2),       # 90 deg -> 180 deg = +90 deg
+        (pi / 4, -pi / 4, -pi / 2),   # 45 deg -> -45 deg = -90 deg
         (1.1, 0.0, -1.1),
         (twopi - 1.0, 0.0, 1.0),
         (1.0, twopi - 1.0, -2.0),
@@ -110,3 +116,59 @@ def test_calc_world_frame_pose():
         pytest.approx(new_world_x, exp_world_x)
         pytest.approx(new_world_y, exp_world_y)
         pytest.approx(new_world_theta, exp_world_theta)
+
+
+def test_yaw_from_odom_message():
+    # This test was created because ROS1 tf.euler_from_quaternion expects (x, y, z, w)
+    # but transforms3d._gohlketransforms.euler_from_quaternion expects (w, x, y, z)
+
+    tests = [
+        ((-0.0, 0.0, 0.11773918055157037, -0.99304455356396), 6.047159470221761)     # quat(x, y, z, w), theta
+    ]
+
+    for quat, exp_theta in tests:
+        odom = Odometry()
+        odom.pose.pose.orientation.x = quat[0]
+        odom.pose.pose.orientation.y = quat[1]
+        odom.pose.pose.orientation.z = quat[2]
+        odom.pose.pose.orientation.w = quat[3]
+
+        assert normalize_theta(yaw_from_odom_message(odom)) == pytest.approx(exp_theta)
+
+
+def test_create_odom_message():
+    # This test was created because ROS1 tf.quaternion_from_euler returns (x, y, z, w)
+    # but transforms3d._gohlketransforms.quaternion_from_euler returns (w, x, y, z)
+
+    tests = [
+        (1.00020, -0.97575, 6.047159,   # world_x, world_y, world_theta
+        0.0, 0.0, 0.0,                  # world_x_linear_v, world_y_linear_v, world_z_angular_v
+        Time(), 'base_link', 'odom',    # odom_time, base_frame_id, world_frame_id
+        (0.0, 0.0, 0.11773918055157037, -0.99304455356396)  # quat=(x, y, z, w)
+        )
+    ]
+
+    for (
+        world_x, world_y, world_theta,
+        world_x_linear_v, world_y_linear_v, world_z_angular_v,
+        odom_time, base_frame_id, world_frame_id,
+        exp_quat
+    ) in tests:
+        odom = create_odometry_message(
+            world_x, world_y, world_theta,
+            world_x_linear_v, world_y_linear_v, world_z_angular_v,
+            odom_time, base_frame_id, world_frame_id
+        )
+        assert odom.pose.pose.position.x == pytest.approx(world_x, abs=1e-6)
+        assert odom.pose.pose.position.y == pytest.approx(world_y, abs=1e-6)
+        assert odom.pose.pose.position.z == pytest.approx(0.0, abs=1e-6)
+        assert odom.pose.pose.orientation.x == pytest.approx(exp_quat[0], abs=1e-6)
+        assert odom.pose.pose.orientation.y == pytest.approx(exp_quat[1], abs=1e-6)
+        assert odom.pose.pose.orientation.z == pytest.approx(exp_quat[2], abs=1e-6)
+        assert odom.pose.pose.orientation.w == pytest.approx(exp_quat[3], abs=1e-6)
+        assert odom.twist.twist.linear.x == pytest.approx(world_x_linear_v, abs=1e-6)
+        assert odom.twist.twist.linear.y == pytest.approx(world_y_linear_v, abs=1e-6)
+        assert odom.twist.twist.linear.z == pytest.approx(0.0, abs=1e-6)
+        assert odom.twist.twist.angular.x == pytest.approx(0.0, abs=1e-6)
+        assert odom.twist.twist.angular.y == pytest.approx(0.0, abs=1e-6)
+        assert odom.twist.twist.angular.z == pytest.approx(world_z_angular_v, abs=1e-6)

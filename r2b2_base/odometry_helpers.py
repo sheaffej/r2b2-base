@@ -18,10 +18,10 @@ def yaw_from_odom_message(odom):
 
     return euler_from_quaternion(
         [
+            odom.pose.pose.orientation.w,
             odom.pose.pose.orientation.x,
             odom.pose.pose.orientation.y,
-            odom.pose.pose.orientation.z,
-            odom.pose.pose.orientation.w,
+            odom.pose.pose.orientation.z
         ])[2]
 
 
@@ -61,7 +61,7 @@ def radians_between(a: float, b: float) -> float:
     # Example if the angles can go from: 0.0 -- 6.0
 
     # a=1.0, b=5.0:  diff is 4.0 or [2.0] <-- this is the answer
-    # 1 - 5 = -4 
+    # 1 - 5 = -4
     #   Since the answer is negative, subtract from the max --> 6 + -4 = 2
     # 5 - 1 = 4
     # Take the smallest answer min(2, 4) --> 2
@@ -97,8 +97,20 @@ def calc_world_frame_pose(world_x_velocity, world_y_velocity, world_angular_velo
     """
     new_world_x = begin_world_x + (world_x_velocity * time_delta_secs)
     new_world_y = begin_world_y + (world_y_velocity * time_delta_secs)
+
+# ------
+    # rclpy.logging.get_logger('base_node').info(f"begin_world_theta: {begin_world_theta}")
+# ------
+
     new_world_theta = begin_world_theta + (world_angular_velocity * time_delta_secs)
+
+# ------
+    # rclpy.logging.get_logger('base_node').info(f"new_world_theta (unnormalized): {new_world_theta}")
+# ------
     new_world_theta = normalize_theta(new_world_theta)
+# ------
+    # rclpy.logging.get_logger('base_node').info(f"new_world_theta (normalized): {new_world_theta}")
+# ------
     return (new_world_x, new_world_y, new_world_theta)
 
 
@@ -117,10 +129,10 @@ def create_odometry_message(world_x, world_y, world_theta,
     # Convert world orientation (theta) to a Quaternion for use with tf and Odometry
     quat_vals = quaternion_from_euler(0, 0, world_theta)
     quat = Quaternion()
-    quat.x = quat_vals[0]
-    quat.y = quat_vals[1]
-    quat.z = quat_vals[2]
-    quat.w = quat_vals[3]
+    quat.w = quat_vals[0]
+    quat.x = quat_vals[1]
+    quat.y = quat_vals[2]
+    quat.z = quat_vals[3]
 
     odom = Odometry()
     odom.header.stamp = odom_time.to_msg()

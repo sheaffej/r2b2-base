@@ -9,6 +9,7 @@ import traceback
 from geometry_msgs.msg import Twist, TransformStamped
 from nav_msgs.msg import Odometry
 import rclpy
+from rclpy.node import Node
 from rclpy.time import Time
 
 from rcl_interfaces.msg import ParameterDescriptor
@@ -79,7 +80,7 @@ class PARAMS:
     ROBOCLAW_REAR_STATS_TOPIC = 'roboclaw_rear_stats_topic'
 
 
-class BaseNode(rclpy.node.Node):
+class BaseNode(Node):
 
     def __init__(self):
         super().__init__(DEFAULTS.NODE_NAME)
@@ -309,6 +310,11 @@ class BaseNode(rclpy.node.Node):
             self._last_odom_time, nowtime
         )
 
+# ----------
+        # self.get_logger().info(f"BASENODE pos x: {self._world_x}, y: {self._world_y}, th: {self._world_theta}")
+        # self.get_logger().info(f"BASENODE v's x_lin: {x_linear_v}, y_lin: {y_linear_v}, z_ang: {z_angular_v}")
+# ----------
+
         time_delta_secs = (nowtime - self._last_odom_time).nanoseconds / 1e9
         self._last_odom_time = nowtime
 
@@ -318,6 +324,11 @@ class BaseNode(rclpy.node.Node):
             time_delta_secs, nowtime,
             self._base_frame_id, self._world_frame_id
         )
+
+# ----------
+        # self.get_logger().info(f"{odom.pose.pose.orientation}")
+# ----------
+
         self._odom_pub.publish(odom)
 
         # Update world pose
@@ -330,6 +341,9 @@ class BaseNode(rclpy.node.Node):
         # -----------------------------------------
         if self._publish_odom_tf:
             quat = odom.pose.pose.orientation
+# ----------
+            # self.get_logger().info(f"quat: {quat}")
+# ----------
             t = TransformStamped()
             t.header.stamp = nowtime.to_msg()
             t.header.frame_id = self._world_frame_id

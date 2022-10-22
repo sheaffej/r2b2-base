@@ -133,16 +133,22 @@ def calc_odometry_from_base_velocity(
     time_delta_secs, odom_time,
     base_frame_id, world_frame_id
 ) -> Odometry:
+    # Helpful rotation calculator
+    # https://www.andre-gaschler.com/rotationconverter/
     world_x_velocity, world_y_velocity, world_angular_velocity = calc_world_frame_velocity(
         x_linear_v, y_linear_v, z_angular_v, world_theta)
-    # print("world_x_velocity: {}".format(world_x_velocity))
-    # print("world_y_velocity: {}".format(world_y_velocity))
-    # print("world_angular_velocity: {}".format(world_angular_velocity))
+
+# ------------
+    # rclpy.logging.get_logger("base_node").info(f"Velocities x_lin {x_linear_v}, y_lin {y_linear_v}, z_ang {z_angular_v}")
+# ------------
 
     world_x, world_y, world_theta = calc_world_frame_pose(
         world_x_velocity, world_y_velocity, world_angular_velocity,
         world_x, world_y, world_theta, time_delta_secs)
-    # print("world coordinates: ({}, {}, {})".format(world_x, world_y, world_theta))
+
+# ------------
+    # rclpy.logging.get_logger("base_node").info("world coordinates: (x:{}, y:{}, th:{})".format(world_x, world_y, world_theta))
+# ------------
 
     odom = create_odometry_message(
         world_x, world_y, world_theta,
