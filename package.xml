@@ -11,7 +11,7 @@
   <depend>ros2launch</depend>
 
   <!-- Lookup Python packages here: https://github.com/ros/rosdistro/blob/master/rosdep/python.yaml -->
-  <depend>python-transforms3d</depend>
+  <depend>python3-transforms3d</depend>
   <depend>python3-flake8</depend>
 
   <test_depend>python3-pytest</test_depend>
